@@ -10,7 +10,7 @@ on:
 jobs:
   build:
     name: Build PKG
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout
@@ -31,7 +31,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /usr/local/ps3dev
-          key: ps3dev-toolchain-v5
+          key: ps3dev-toolchain-ubuntu22-v1
 
       - name: Build ps3toolchain
         if: steps.cache-ps3dev.outputs.cache-hit != 'true'
@@ -45,9 +45,7 @@ jobs:
           git clone https://github.com/ps3dev/ps3toolchain.git
           cd ps3toolchain
 
-          # Patch check-python.sh to accept python3-config
-          # The script checks for 'python-config' and Python.h
-          # On modern Ubuntu these are only available as python3-config
+          # Patch check-python.sh for python3
           sed -i 's/python-config/python3-config/g' depends/check-python.sh
           sed -i 's/python-dev/python3-dev/g'       depends/check-python.sh
 
@@ -89,4 +87,7 @@ jobs:
         with:
           files: |
             ps3wave.pkg
-            ps3wa
+            ps3wave.self
+          body: |
+            PS3 Wave Screensaver — install ps3wave.pkg via Package Manager on CFW.
+            Press any button 
