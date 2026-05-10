@@ -1,0 +1,83 @@
+name: Build PS3 Wave Screensaver PKG
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  # Also allows manual trigger from GitHub Actions tab
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build PKG
+    runs-on: ubuntu-latest
+
+    # Use the official ps3dev Docker image — has ps3toolchain + PSL1GHT prebuilt
+    container:
+      image: mlafeldt/ps3dev
+
+    steps:
+      # ── 1. Checkout repository ────────────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── 2. Set environment variables ──────────────────────────────
+      - name: Set PS3DEV environment
+        run: |
+          echo "PS3DEV=/usr/local/ps3dev"   >> $GITHUB_ENV
+          echo "PSL1GHT=/usr/local/ps3dev/ppu" >> $GITHUB_ENV
+          echo "PATH=/usr/local/ps3dev/bin:/usr/local/ps3dev/ppu/bin:$PATH" >> $GITHUB_ENV
+
+      # ── 3. Verify toolchain is present ────────────────────────────
+      - name: Verify toolchain
+        run: |
+          ppu-gcc --version
+          echo "PS3DEV: $PS3DEV"
+          echo "PSL1GHT: $PSL1GHT"
+          ls $PS3DEV/bin/
+
+      # ── 4. Build EBOOT.BIN ────────────────────────────────────────
+      - name: Build
+        run: make
+
+      # ── 5. Build PKG ──────────────────────────────────────────────
+      - name: Build PKG
+        run: make pkg
+
+      # ── 6. Verify output ──────────────────────────────────────────
+      - name: Verify output
+        run: |
+          ls -lh ps3wave.pkg
+          ls -lh ps3wave.self
+          echo "Build successful!"
+
+      # ── 7. Upload PKG as downloadable artifact ────────────────────
+      - name: Upload PKG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ps3wave-pkg
+          path: |
+            ps3wave.pkg
+            ps3wave.self
+          retention-days: 30
+
+      # ── 8. Create a GitHub Release on tagged commits ──────────────
+      # Tag a commit with e.g. "git tag v1.0 && git push --tags"
+      # to automatically create a release with the PKG attached.
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            ps3wave.pkg
+            ps3wave.self
+          body: |
+            ## PS3 Wave Screensaver
+
+            Install `ps3wave.pkg` via Package Manager on CFW (Rebug / Evilnat).
+
+            Reads your installed `lines.qrc` wave file directly from firmware.
+            Press any button to exit back to XMB.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
