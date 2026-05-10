@@ -5,7 +5,6 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-  # Also allows manual trigger from GitHub Actions tab
   workflow_dispatch:
 
 jobs:
@@ -13,47 +12,64 @@ jobs:
     name: Build PKG
     runs-on: ubuntu-latest
 
-    # Use the official ps3dev Docker image — has ps3toolchain + PSL1GHT prebuilt
-    container:
-      image: mlafeldt/ps3dev
-
     steps:
-      # ── 1. Checkout repository ────────────────────────────────────
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ── 2. Set environment variables ──────────────────────────────
-      - name: Set PS3DEV environment
+      # Install build dependencies
+      - name: Install dependencies
         run: |
-          echo "PS3DEV=/usr/local/ps3dev"   >> $GITHUB_ENV
-          echo "PSL1GHT=/usr/local/ps3dev/ppu" >> $GITHUB_ENV
+          sudo apt-get update
+          sudo apt-get install -y \
+            autoconf automake bison flex gcc g++ \
+            libelf-dev make texinfo libncurses5-dev \
+            patch python3 wget zlib1g-dev libtool \
+            libtool-bin bzip2 libgmp-dev pkg-config \
+            libssl-dev git
+
+      # Cache the toolchain so subsequent runs are fast (~3min vs ~60min)
+      - name: Cache ps3toolchain
+        id: cache-ps3dev
+        uses: actions/cache@v4
+        with:
+          path: /usr/local/ps3dev
+          key: ps3dev-toolchain-v3
+
+      # Build toolchain only if not cached
+      - name: Build ps3toolchain
+        if: steps.cache-ps3dev.outputs.cache-hit != 'true'
+        run: |
+          export PS3DEV=/usr/local/ps3dev
+          export PSL1GHT=$PS3DEV
+          export PATH=$PATH:$PS3DEV/bin:$PS3DEV/ppu/bin:$PS3DEV/spu/bin
+          sudo mkdir -p $PS3DEV
+          sudo chmod 777 $PS3DEV
+          git clone https://github.com/ps3dev/ps3toolchain.git
+          cd ps3toolchain
+          PARALLEL_MAKE=-j$(nproc) ./toolchain.sh
+          cd ..
+          git clone https://github.com/ps3dev/PSL1GHT.git
+          cd PSL1GHT
+          make install
+          cd ..
+
+      - name: Set environment
+        run: |
+          echo "PS3DEV=/usr/local/ps3dev"       >> $GITHUB_ENV
+          echo "PSL1GHT=/usr/local/ps3dev/ppu"  >> $GITHUB_ENV
           echo "PATH=/usr/local/ps3dev/bin:/usr/local/ps3dev/ppu/bin:$PATH" >> $GITHUB_ENV
 
-      # ── 3. Verify toolchain is present ────────────────────────────
       - name: Verify toolchain
         run: |
-          ppu-gcc --version
-          echo "PS3DEV: $PS3DEV"
-          echo "PSL1GHT: $PSL1GHT"
-          ls $PS3DEV/bin/
+          /usr/local/ps3dev/ppu/bin/ppu-gcc --version
 
-      # ── 4. Build EBOOT.BIN ────────────────────────────────────────
       - name: Build
         run: make
 
-      # ── 5. Build PKG ──────────────────────────────────────────────
       - name: Build PKG
         run: make pkg
 
-      # ── 6. Verify output ──────────────────────────────────────────
-      - name: Verify output
-        run: |
-          ls -lh ps3wave.pkg
-          ls -lh ps3wave.self
-          echo "Build successful!"
-
-      # ── 7. Upload PKG as downloadable artifact ────────────────────
-      - name: Upload PKG artifact
+      - name: Upload PKG
         uses: actions/upload-artifact@v4
         with:
           name: ps3wave-pkg
@@ -62,9 +78,6 @@ jobs:
             ps3wave.self
           retention-days: 30
 
-      # ── 8. Create a GitHub Release on tagged commits ──────────────
-      # Tag a commit with e.g. "git tag v1.0 && git push --tags"
-      # to automatically create a release with the PKG attached.
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
@@ -73,11 +86,7 @@ jobs:
             ps3wave.pkg
             ps3wave.self
           body: |
-            ## PS3 Wave Screensaver
-
-            Install `ps3wave.pkg` via Package Manager on CFW (Rebug / Evilnat).
-
-            Reads your installed `lines.qrc` wave file directly from firmware.
-            Press any button to exit back to XMB.
+            PS3 Wave Screensaver — install ps3wave.pkg via Package Manager on CFW.
+            Press any button to exit.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
