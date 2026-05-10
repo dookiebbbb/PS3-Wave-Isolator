@@ -1,0 +1,15 @@
+# PARAM.SFO source — used by sfo.py to generate the binary PARAM.SFO
+# This file is for reference; the actual binary is built by 'make pkg'
+
+TITLE       = PS3 Wave Screensaver
+APP_VER     = 01.00
+ATTRIBUTE   = 0
+BOOTABLE    = 1
+CATEGORY    = HG
+LICENSE     = 
+PARENTAL_LEVEL = 0
+PS3_SYSTEM_VER = 0000000000000000
+RESOLUTION  = 63
+SOUND_FORMAT = 1
+TITLE_ID    = WAVE00001
+VERSION     = 01.00
