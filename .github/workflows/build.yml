@@ -16,26 +16,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Install build dependencies
       - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             autoconf automake bison flex gcc g++ \
             libelf-dev make texinfo libncurses5-dev \
-            patch python3 wget zlib1g-dev libtool \
-            libtool-bin bzip2 libgmp-dev pkg-config \
-            libssl-dev git
+            patch python3 python3-dev wget zlib1g-dev \
+            libtool libtool-bin bzip2 libgmp-dev \
+            pkg-config libssl-dev git
+          # ps3toolchain checks for 'python-config' — symlink python3-config
+          sudo ln -sf /usr/bin/python3-config /usr/local/bin/python-config
+          sudo ln -sf /usr/bin/python3 /usr/local/bin/python
 
-      # Cache the toolchain so subsequent runs are fast (~3min vs ~60min)
       - name: Cache ps3toolchain
         id: cache-ps3dev
         uses: actions/cache@v4
         with:
           path: /usr/local/ps3dev
-          key: ps3dev-toolchain-v3
+          key: ps3dev-toolchain-v4
 
-      # Build toolchain only if not cached
       - name: Build ps3toolchain
         if: steps.cache-ps3dev.outputs.cache-hit != 'true'
         run: |
@@ -55,13 +55,12 @@ jobs:
 
       - name: Set environment
         run: |
-          echo "PS3DEV=/usr/local/ps3dev"       >> $GITHUB_ENV
-          echo "PSL1GHT=/usr/local/ps3dev/ppu"  >> $GITHUB_ENV
+          echo "PS3DEV=/usr/local/ps3dev"      >> $GITHUB_ENV
+          echo "PSL1GHT=/usr/local/ps3dev/ppu" >> $GITHUB_ENV
           echo "PATH=/usr/local/ps3dev/bin:/usr/local/ps3dev/ppu/bin:$PATH" >> $GITHUB_ENV
 
       - name: Verify toolchain
-        run: |
-          /usr/local/ps3dev/ppu/bin/ppu-gcc --version
+        run: /usr/local/ps3dev/ppu/bin/ppu-gcc --version
 
       - name: Build
         run: make
@@ -88,5 +87,4 @@ jobs:
           body: |
             PS3 Wave Screensaver — install ps3wave.pkg via Package Manager on CFW.
             Press any button to exit.
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
